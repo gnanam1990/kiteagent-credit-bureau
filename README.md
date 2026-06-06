@@ -8,6 +8,12 @@ This repository is built from the staged OpenCode prompt pack in `prompts/`.
 
 Build transparent reputation, reliability, counterparty, and payment-history profiles for Kite agents.
 
+## Proof of Work
+
+- Live Vercel deployment: https://kiteagent-credit-bureau.vercel.app
+- Public proof report: [docs/PROOF_OF_WORK.md](docs/PROOF_OF_WORK.md)
+- Rendered screenshot: [docs/screenshot.jpg](docs/screenshot.jpg)
+
 ## Core modules
 
 - **Agent Identity Profile** — Profile page for an agent address with labels, activity, and linked products.
