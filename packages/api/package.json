@@ -12,7 +12,9 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.6",
+    "@kiteagent-credit-bureau/connectors": "workspace:*",
     "@kiteagent-credit-bureau/core": "workspace:*",
+    "@kiteagent-credit-bureau/worker": "workspace:*",
     "hono": "^4.10.7"
   },
   "devDependencies": {
