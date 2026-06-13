@@ -1,56 +1,108 @@
 # KiteAgent Credit Bureau
 
+> Reputation, reliability, and credit-style profiles for autonomous Kite agents.
+
 [![CI](https://github.com/gnanam1990/kiteagent-credit-bureau/actions/workflows/ci.yml/badge.svg)](https://github.com/gnanam1990/kiteagent-credit-bureau/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Reputation, reliability, and credit-style profiles for autonomous Kite agents.
+## Overview
 
-This repository is built from the staged prompt pack in [`prompts/`](prompts/).
+KiteAgent Credit Bureau builds transparent reputation, reliability, counterparty, and
+payment-history profiles for agents operating on the Kite network. It is a pnpm/TypeScript
+monorepo: a Hono API, a worker runtime, a pure-TypeScript domain core, on-chain connectors,
+and a Vite + React frontend. The API performs a real Kite Mainnet read (current block height
+plus explorer gas stats); most product modules — including the credit-score calculation — are
+preview-stage and clearly labeled as such.
 
-## Product promise
+## Features
 
-Build transparent reputation, reliability, counterparty, and payment-history profiles for Kite agents.
+- **Agent Identity Profile** — profile view for an agent address with labels, activity, and linked items.
+- **Hono Public Trust API** — health, metadata, item CRUD, activity log, approvals, and a live chain-stats endpoint.
+- **Live Kite Mainnet read** — `GET /chain/stats` fetches the current block height over JSON-RPC (`viem`) and gas/network stats from the KiteScan explorer, surfaced in the app's live-network strip; it degrades to a preview-safe payload if chain infrastructure is unreachable.
+- **Approval-first execution** — high-risk or fund-moving actions are gated behind an explicit approval queue (`requiresApproval` policy in `core`).
+- **Worker runtime** — an in-process preview runtime (`PreviewRuntime`) wired into the API at `POST /runs/simulate`.
+- **Pure-TypeScript core** — EVM/Kite address and tx-hash validation, risk weighting, and approval rules.
+- **Graceful degradation** — if the API is unreachable, the frontend renders from bundled preview data.
 
-## Live
+> Preview: the Score Calculation Engine, Counterparty Graph, Payment Reliability History, and the
+> credit-score UI are preview-stage. The trust score and factor breakdown shown in the app are
+> illustrative, hard-coded preview values — they are **not** computed from on-chain history.
+> See [Status](#status).
 
-- App: https://kiteagent-credit-bureau.vercel.app
-- API: https://kiteagent-credit-bureau.vercel.app/api/health
-- Live chain read: https://kiteagent-credit-bureau.vercel.app/api/chain/stats
-- Proof report: [docs/PROOF_OF_WORK.md](docs/PROOF_OF_WORK.md) · screenshot: [docs/screenshot.jpg](docs/screenshot.jpg)
+## Tech stack
 
-## Core modules
+- **Language:** TypeScript (ESM), Node.js 22
+- **Package manager:** pnpm 9 (workspace monorepo)
+- **API:** Hono + `@hono/node-server`
+- **Chain:** viem (Kite Mainnet, chain id 2366)
+- **Frontend:** Vite, React 19, Tailwind CSS v4, lucide-react
+- **Testing:** Vitest
+- **Build/bundle:** esbuild (serverless function), Vite (SPA)
 
-- **Agent Identity Profile** — Profile page for an agent address with labels, activity, and linked products.
-- **Score Calculation Engine** — Transparent reliability score with factor breakdown.
-- **Counterparty Graph** — Map relationships and recurring counterparties.
-- **Payment Reliability History** — Track payment success behavior over time.
-- **Public Trust API** — API endpoints for other apps to query agent reputation.
+## Architecture
 
-## What is real
+```
+server/index.ts        Hono root mounted at /api, bundled into a serverless function
+packages/api/          Hono app, routes, in-memory data, live chain read
+packages/core/         pure-TypeScript domain types, validation, risk + approval policy
+packages/worker/       PreviewRuntime — enqueue/tick preview jobs
+packages/connectors/   Kite chain definitions, viem public client, KiteScan helper, cached fetch
+packages/web/          Vite + React 19 single-page frontend
+```
 
-- Vite + React 19 + TypeScript frontend with the required product routes.
-- Hono API **deployed live** as a Vercel Serverless Function at `/api` (not just local dev).
-- **Real Kite Mainnet read** at `GET /api/chain/stats` — live block height over JSON-RPC (`viem`) plus
-  gas/network stats from the KiteScan explorer, surfaced in the app's live-network strip.
-- Pure TypeScript core package for Kite-safe address/tx validation, risk policies, activity logs, and approval rules.
-- Worker runtime (`@kiteagent-credit-bureau/worker`) wired into the live API at `POST /api/runs/simulate`.
-- Tests for core validation, API routes (incl. chain + worker), and worker execution.
+## Getting started
 
-## What is PREVIEW
+### Prerequisites
 
-- The app degrades gracefully: if the live API is unreachable, the frontend renders from bundled preview data.
-- Agentic decisions, payment verification, fund movement, trading, security, and scoring behavior are preview-safe
-  unless explicitly verified by backend code.
-- Client-submitted payment claims are not trusted. Fund-moving or risky actions require explicit approval.
-- No official mainnet contract address is invented in this repo.
+- Node.js 22+
+- pnpm 9 (`corepack enable` or install `pnpm@9.15.9`)
 
-## API endpoints
+### Installation
 
-Base path in production is `/api` (same-origin); base path in local dev is `http://localhost:8787`.
+```bash
+pnpm install
+```
+
+### Configuration
+
+Copy `.env.example` and adjust as needed. All variables are read by the backend or the dev frontend;
+no secret values are committed.
+
+| Variable | Purpose |
+| --- | --- |
+| `KITE_NETWORK` | Active Kite network (`mainnet` / `testnet`). |
+| `KITE_MAINNET_RPC` | Kite Mainnet JSON-RPC endpoint. |
+| `KITE_MAINNET_API` | KiteScan Mainnet explorer API base. |
+| `KITE_TESTNET_RPC` | Kite Testnet JSON-RPC endpoint. |
+| `KITE_TESTNET_API` | KiteScan Testnet explorer API base. |
+| `API_PORT` | Local API server port (default `8787`). |
+| `WEB_ORIGIN` | Allowed CORS origin for the API (default `http://localhost:5173`). |
+| `VITE_API_URL` | Frontend API base for local dev. Ignored in production, where the SPA calls same-origin `/api`. |
+| `WEBHOOK_SECRET_DEMO` | Local-only placeholder secret for the preview webhook intake. |
+| `LLM_PROVIDER` | LLM provider selector; ships as `preview` (no live model calls). |
+
+### Running
+
+```bash
+pnpm dev    # runs the API and web app together
+```
+
+- Frontend: `http://localhost:5173`
+- API: `http://localhost:8787`
+
+```bash
+curl http://localhost:8787/health        # { "ok": true, "service": "kiteagent-credit-bureau" }
+curl http://localhost:8787/chain/stats   # live Kite Mainnet block height + gas
+```
+
+## Usage
+
+API base path is `/api` in production (same-origin) and `http://localhost:8787` in local dev.
 
 | Method | Path | Description |
 | --- | --- | --- |
 | GET | `/health` | Service health probe. |
-| GET | `/meta` | Product + module metadata (single source). |
+| GET | `/meta` | Product + module metadata. |
 | GET | `/modules` | Product modules. |
 | GET | `/scores` | List items. |
 | POST | `/scores` | Create an item (`name`, `description`, `owner` required; `owner` must be a valid EVM address). |
@@ -59,46 +111,47 @@ Base path in production is `/api` (same-origin); base path in local dev is `http
 | POST | `/runs/simulate` | Simulate a run through the worker runtime. |
 | GET | `/approvals` | Pending approvals. |
 | POST | `/approvals/:id/approve` · `/deny` | Resolve an approval. |
-| GET | `/chain/stats` | **Live** Kite Mainnet block height + gas (degrades to preview if infra is down). |
+| GET | `/chain/stats` | Live Kite Mainnet block height + gas (degrades to a preview payload if infra is down). |
 | POST | `/webhooks/:triggerId` | Preview webhook intake. |
 
-## Structure
-
-```txt
-server/index.ts        Hono entry mounted at /api (bundled into a Vercel function)
-packages/web/          Vite + React 19 frontend
-packages/api/          Hono API server (app + routes + live chain read)
-packages/worker/       background jobs and runtime simulation
-packages/core/         pure TypeScript domain logic
-packages/connectors/   Kite constants, KiteScan helper, cached fetch, RPC client
-```
-
-## Run locally
+## Testing
 
 ```bash
-pnpm install
-pnpm dev
+pnpm -r typecheck                                   # type-check every package
+pnpm -r test                                        # Vitest across packages (core, api, worker)
+pnpm --filter @kiteagent-credit-bureau/web build    # production SPA build
 ```
 
-Frontend: `http://localhost:5173` · API: `http://localhost:8787`
+Tests cover core validation/policy, API routes (including the chain and worker endpoints), and the
+worker runtime. The connectors and web packages currently pass with no tests.
 
-```bash
-curl http://localhost:8787/health         # { "ok": true, "service": "kiteagent-credit-bureau" }
-curl http://localhost:8787/chain/stats     # live Kite Mainnet block height + gas
+## Project structure
+
+```
+.
+├── server/index.ts          serverless function entry (Hono root at /api)
+├── scripts/vercel-build.mjs  Build Output API bundler (SPA + esbuild function)
+├── packages/
+│   ├── api/                 Hono API
+│   ├── core/                domain logic
+│   ├── worker/              preview runtime
+│   ├── connectors/          Kite/viem connectors
+│   └── web/                 React frontend
+├── docs/                    proof-of-work notes + screenshot
+└── .env.example
 ```
 
-## Verification
+## Status
 
-```bash
-pnpm -r typecheck
-pnpm -r test
-pnpm --filter @kiteagent-credit-bureau/web build
-```
+Preview / MVP.
+
+- **Real:** the Hono API and its routes; the live Kite Mainnet read at `/chain/stats` (block height via viem + KiteScan gas stats); core address/tx validation, risk weighting, and approval policy; the worker preview runtime; the Vite/React frontend with working item create/list, activity, and approval flows. The app is deployed at <https://kiteagent-credit-bureau.vercel.app> (API health at `/api/health`).
+- **Preview / not computed:** the credit-score UI (`CreditHome`) shows a hard-coded trust score and factor-breakdown percentages — these are illustrative placeholders, not derived from on-chain data. The Score Calculation Engine, Counterparty Graph, and Payment Reliability History modules are preview-stage. API state is in-memory (created items are not persisted server-side; the frontend mirrors them in `localStorage`). The webhook endpoint accepts and echoes payloads but performs no production processing.
+- **Safety:** client-submitted payment claims are not trusted; fund-moving or risky actions require explicit approval. No mainnet contract address is invented in this repo.
 
 ## Deployment
 
-Vercel is connected to this repo and auto-deploys `main` via the Build Output API
-(`scripts/vercel-build.mjs`):
+Deployed via the Build Output API (`scripts/vercel-build.mjs`):
 
 - **Static frontend** — the built Vite SPA.
 - **Serverless API** — `server/index.ts` is esbuild-bundled into a self-contained function mounted at `/api`.
